@@ -151,6 +151,16 @@ public:
 		return getBack();
 	}
 
+	/// Fill the array.
+	void fill(Iterator begin, Iterator end, const T& val)
+	{
+		while(begin != end)
+		{
+			*begin = val;
+			++begin;
+		}
+	}
+
 	// Get size
 #define ANKI_ARRAY_SIZE_METHOD(type, condition) \
 	ANKI_ENABLE_METHOD(condition) \

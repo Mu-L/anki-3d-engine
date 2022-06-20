@@ -27,7 +27,7 @@ layout(set = MATERIAL_SET_GLOBAL, binding = MATERIAL_BINDING_GLOBAL_UNIFORMS) un
 	MaterialGlobalUniforms u_global;
 };
 
-layout(set = MATERIAL_SET_LOCAL, binding = MATERIAL_BINDING_RENDERABLE_GPU_VIEW) uniform b_renderableGpuViews
+layout(set = MATERIAL_SET_LOCAL, binding = MATERIAL_BINDING_RENDERABLE_GPU_VIEW, std430) buffer b_renderableGpuViews
 {
 	RenderableGpuView u_renderableGpuViews[1];
 };

@@ -9,15 +9,14 @@
 
 #include <AnKi/Resource/Common.h>
 #include <AnKi/Math.h>
+#include <AnKi/Gr/Common.h>
 
 namespace anki {
 
 /// @addtogroup resource
 /// @{
 
-static constexpr const char* MESH_MAGIC = "ANKIMES5";
-
-constexpr U32 MESH_BINARY_BUFFER_ALIGNMENT = 16;
+static constexpr const char* MESH_MAGIC = "ANKIMES6";
 
 enum class MeshBinaryFlag : U32
 {
@@ -29,8 +28,7 @@ enum class MeshBinaryFlag : U32
 };
 ANKI_ENUM_ALLOW_NUMERIC_OPERATIONS(MeshBinaryFlag)
 
-/// Vertex buffer info. The size of the buffer is m_vertexStride*MeshBinaryHeader::m_totalVertexCount aligned to
-/// MESH_BINARY_BUFFER_ALIGNMENT.
+/// Vertex buffer info.
 class MeshBinaryVertexBuffer
 {
 public:
@@ -94,8 +92,8 @@ public:
 class MeshBinarySubMesh
 {
 public:
-	U32 m_firstIndex;
-	U32 m_indexCount;
+	Array<U32, MAX_LOD_COUNT> m_firstIndices;
+	Array<U32, MAX_LOD_COUNT> m_indexCounts;
 
 	/// Bounding box min.
 	Vec3 m_aabbMin;
@@ -106,8 +104,10 @@ public:
 	template<typename TSerializer, typename TClass>
 	static void serializeCommon(TSerializer& s, TClass self)
 	{
-		s.doValue("m_firstIndex", offsetof(MeshBinarySubMesh, m_firstIndex), self.m_firstIndex);
-		s.doValue("m_indexCount", offsetof(MeshBinarySubMesh, m_indexCount), self.m_indexCount);
+		s.doArray("m_firstIndices", offsetof(MeshBinarySubMesh, m_firstIndices), &self.m_firstIndices[0],
+				  self.m_firstIndices.getSize());
+		s.doArray("m_indexCounts", offsetof(MeshBinarySubMesh, m_indexCounts), &self.m_indexCounts[0],
+				  self.m_indexCounts.getSize());
 		s.doValue("m_aabbMin", offsetof(MeshBinarySubMesh, m_aabbMin), self.m_aabbMin);
 		s.doValue("m_aabbMax", offsetof(MeshBinarySubMesh, m_aabbMax), self.m_aabbMax);
 	}
@@ -125,21 +125,21 @@ public:
 	}
 };
 
-/// The 1st things that appears in a mesh binary. @note The index and vertex buffers are aligned to
-/// MESH_BINARY_BUFFER_ALIGNMENT bytes.
+/// The 1st things that appears in a mesh binary.
 class MeshBinaryHeader
 {
 public:
 	Array<U8, 8> m_magic;
 	MeshBinaryFlag m_flags;
-	Array<MeshBinaryVertexBuffer, U32(VertexAttributeId::COUNT)> m_vertexBuffers;
+	Array<MeshBinaryVertexBuffer, MAX_VERTEX_ATTRIBUTES> m_vertexBuffers;
 	U32 m_vertexBufferCount;
-	Array<MeshBinaryVertexAttribute, U32(VertexAttributeId::COUNT)> m_vertexAttributes;
+	Array<MeshBinaryVertexAttribute, MAX_VERTEX_ATTRIBUTES> m_vertexAttributes;
 	IndexType m_indexType;
 	Array<U8, 3> m_padding;
-	U32 m_totalIndexCount;
-	U32 m_totalVertexCount;
+	Array<U32, MAX_LOD_COUNT> m_totalIndexCounts;
+	Array<U32, MAX_LOD_COUNT> m_totalVertexCounts;
 	U32 m_subMeshCount;
+	U32 m_lodCount;
 
 	/// Bounding box min.
 	Vec3 m_aabbMin;
@@ -159,9 +159,12 @@ public:
 				  self.m_vertexAttributes.getSize());
 		s.doValue("m_indexType", offsetof(MeshBinaryHeader, m_indexType), self.m_indexType);
 		s.doArray("m_padding", offsetof(MeshBinaryHeader, m_padding), &self.m_padding[0], self.m_padding.getSize());
-		s.doValue("m_totalIndexCount", offsetof(MeshBinaryHeader, m_totalIndexCount), self.m_totalIndexCount);
-		s.doValue("m_totalVertexCount", offsetof(MeshBinaryHeader, m_totalVertexCount), self.m_totalVertexCount);
+		s.doArray("m_totalIndexCounts", offsetof(MeshBinaryHeader, m_totalIndexCounts), &self.m_totalIndexCounts[0],
+				  self.m_totalIndexCounts.getSize());
+		s.doArray("m_totalVertexCounts", offsetof(MeshBinaryHeader, m_totalVertexCounts), &self.m_totalVertexCounts[0],
+				  self.m_totalVertexCounts.getSize());
 		s.doValue("m_subMeshCount", offsetof(MeshBinaryHeader, m_subMeshCount), self.m_subMeshCount);
+		s.doValue("m_lodCount", offsetof(MeshBinaryHeader, m_lodCount), self.m_lodCount);
 		s.doValue("m_aabbMin", offsetof(MeshBinaryHeader, m_aabbMin), self.m_aabbMin);
 		s.doValue("m_aabbMax", offsetof(MeshBinaryHeader, m_aabbMax), self.m_aabbMax);
 	}

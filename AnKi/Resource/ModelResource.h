@@ -18,62 +18,18 @@ namespace anki {
 /// @{
 
 /// @memberof ModelResource
-class ModelVertexBufferBinding
-{
-public:
-	BufferPtr m_buffer;
-	PtrSize m_offset;
-	PtrSize m_stride;
-
-	Bool operator==(const ModelVertexBufferBinding& b) const
-	{
-		return m_buffer == b.m_buffer && m_offset == b.m_offset && m_stride == b.m_stride;
-	}
-
-	Bool operator!=(const ModelVertexBufferBinding& b) const
-	{
-		return !(*this == b);
-	}
-};
-
-/// @memberof ModelResource
-class ModelVertexAttribute
-{
-public:
-	VertexAttributeId m_location;
-	Format m_format;
-	U32 m_bufferBinding;
-	U32 m_relativeOffset;
-
-	Bool operator==(const ModelVertexAttribute& b) const
-	{
-		return m_bufferBinding == b.m_bufferBinding && m_format == b.m_format && m_relativeOffset == b.m_relativeOffset
-			   && m_location == b.m_location;
-	}
-
-	Bool operator!=(const ModelVertexAttribute& b) const
-	{
-		return !(*this == b);
-	}
-};
-
-/// @memberof ModelResource
 /// Part of the information required render the model.
 class ModelRenderingInfo
 {
 public:
 	ShaderProgramPtr m_program;
 
-	Array<ModelVertexBufferBinding, MAX_VERTEX_ATTRIBUTES> m_vertexBufferBindings;
-	U32 m_vertexBufferBindingCount;
-	Array<ModelVertexAttribute, MAX_VERTEX_ATTRIBUTES> m_vertexAttributes;
-	U32 m_vertexAttributeCount;
-
-	BufferPtr m_indexBuffer;
 	PtrSize m_indexBufferOffset;
 	IndexType m_indexType;
 	U32 m_firstIndex;
 	U32 m_indexCount;
+
+	Array<PtrSize, U32(VertexStreamId::COUNT)> m_vertexBufferOffsets;
 };
 
 /// Part of the information required to create a TLAS and a SBT.
@@ -83,12 +39,9 @@ class ModelRayTracingInfo
 public:
 	AccelerationStructurePtr m_bottomLevelAccelerationStructure;
 	U32 m_shaderGroupHandleIndex;
-
-	/// Get some pointers to pass to the command buffer for refcounting.
-	ConstWeakArray<GrObjectPtr> m_grObjectReferences;
 };
 
-/// Model patch class. Its very important class and it binds a material with a few mesh (one for each LOD).
+/// Model patch class. Its very important class and it binds a material with a mesh.
 class ModelPatch
 {
 	friend class ModelResource;
@@ -99,14 +52,14 @@ public:
 		return m_mtl;
 	}
 
-	const MeshResourcePtr& getMesh(U32 lod) const
+	const MeshResourcePtr& getMesh() const
 	{
-		return m_meshes[lod];
+		return m_mesh;
 	}
 
 	const Aabb& getBoundingShape() const
 	{
-		return m_meshes[0]->getBoundingShape();
+		return m_aabb;
 	}
 
 	/// Get information for rendering.
@@ -116,57 +69,33 @@ public:
 	void getRayTracingInfo(const RenderingKey& key, ModelRayTracingInfo& info) const;
 
 private:
+	class Lod
+	{
+	public:
+		PtrSize m_indexBufferOffset = MAX_PTR_SIZE;
+		U32 m_firstIndex = MAX_U32;
+		U32 m_indexCount = MAX_U32;
+
+		Array<PtrSize, U32(VertexStreamId::COUNT)> m_vertexBufferOffsets = {};
+	};
+
 #if ANKI_ENABLE_ASSERTIONS
 	ModelResource* m_model = nullptr;
 #endif
 	MaterialResourcePtr m_mtl;
-	Array<MeshResourcePtr, MAX_LOD_COUNT> m_meshes; ///< Just keep the references.
-	DynamicArray<GrObjectPtr> m_grObjectRefs;
+	MeshResourcePtr m_mesh; ///< Just keep the references.
 
-	// Begin cached data
-	class VertexAttributeInfo
-	{
-	public:
-		U32 m_bufferBinding : 8;
-		U32 m_relativeOffset : 24;
-		Format m_format = Format::NONE;
-	};
-
-	Array<VertexAttributeInfo, U(VertexAttributeId::COUNT)> m_vertexAttributeInfos;
-
-	class VertexBufferInfo
-	{
-	public:
-		BufferPtr m_buffer;
-		PtrSize m_stride : 16;
-		PtrSize m_offset : 48;
-	};
-
-	Array2d<VertexBufferInfo, MAX_LOD_COUNT, U(VertexAttributeBufferId::COUNT)> m_vertexBufferInfos;
-
-	class IndexBufferInfo
-	{
-	public:
-		BufferPtr m_buffer;
-		PtrSize m_offset;
-		U32 m_firstIndex = MAX_U32;
-		U32 m_indexCount = MAX_U32;
-	};
-
-	Array<IndexBufferInfo, MAX_LOD_COUNT> m_indexBufferInfos;
-	BitSet<U(VertexAttributeId::COUNT)> m_presentVertexAttributes = {false};
-	IndexType m_indexType : 2;
-	// End cached data
-
-	U8 m_meshLodCount : 6;
-
-	Error init(ModelResource* model, ConstWeakArray<CString> meshFNames, const CString& mtlFName, U32 subMeshIndex,
-			   Bool async, ResourceManager* resources);
+	Array<Lod, MAX_LOD_COUNT> m_lodInfos;
+	Aabb m_aabb;
+	U32 m_meshLodCount = 0;
 
 	[[nodiscard]] Bool supportsSkinning() const
 	{
-		return m_meshes[0]->hasBoneWeights() && m_mtl->supportsSkinning();
+		return m_mesh->isVertexStreamPresent(VertexStreamId::BONE_IDS) && m_mtl->supportsSkinning();
 	}
+
+	Error init(ModelResource* model, CString meshFName, const CString& mtlFName, U32 subMeshIndex, Bool async,
+			   ResourceManager* resources);
 };
 
 /// Model is an entity that acts as a container for other resources. Models are all the non static objects in a map.
@@ -177,8 +106,6 @@ private:
 /// 	<modelPatches>
 /// 		<modelPatch [subMeshIndex=int]>
 /// 			<mesh>path/to/mesh.mesh</mesh>
-///				[<mesh1>path/to/mesh_lod_1.ankimesh</mesh1>]
-///				[<mesh2>path/to/mesh_lod_2.ankimesh</mesh2>]
 /// 			<material>path/to/material.ankimtl</material>
 /// 		</modelPatch>
 /// 		...

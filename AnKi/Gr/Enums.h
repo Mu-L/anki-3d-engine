@@ -492,6 +492,12 @@ enum class IndexType : U8
 	COUNT
 };
 
+inline U32 getIndexSize(IndexType type)
+{
+	ANKI_ASSERT(type < IndexType::COUNT);
+	return 2u << U32(type);
+}
+
 /// Rasterization order.
 enum class RasterizationOrder : U8
 {

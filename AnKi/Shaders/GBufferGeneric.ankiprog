@@ -60,7 +60,7 @@ layout(set = MATERIAL_SET_LOCAL, binding = MATERIAL_BINDING_LOCAL_UNIFORMS, std4
 	U32 u_localUniforms[];
 };
 
-layout(set = MATERIAL_SET_LOCAL, binding = MATERIAL_BINDING_RENDERABLE_GPU_VIEW) uniform b_renderableGpuView
+layout(set = MATERIAL_SET_LOCAL, binding = MATERIAL_BINDING_RENDERABLE_GPU_VIEW, std430) buffer b_renderableGpuView
 {
 	RenderableGpuView u_renderableGpuViews[MAX_INSTANCE_COUNT];
 };

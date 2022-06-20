@@ -20,25 +20,30 @@ MeshBinaryLoader::~MeshBinaryLoader()
 
 Error MeshBinaryLoader::load(const ResourceFilename& filename)
 {
-	auto& alloc = m_alloc;
-
-	// Load header
+	// Load header + submeshes
 	ANKI_CHECK(m_manager->getFilesystem().openFile(filename, m_file));
 	ANKI_CHECK(m_file->read(&m_header, sizeof(m_header)));
 	ANKI_CHECK(checkHeader());
+	ANKI_CHECK(loadSubmeshes());
 
-	// Read submesh info
+	return Error::NONE;
+}
+
+Error MeshBinaryLoader::loadSubmeshes()
+{
+	m_subMeshes.create(m_alloc, m_header.m_subMeshCount);
+	ANKI_CHECK(m_file->read(&m_subMeshes[0], m_subMeshes.getSizeInBytes()));
+
+	// Checks
+	const U32 indicesPerFace = !!(m_header.m_flags & MeshBinaryFlag::QUAD) ? 4 : 3;
+
+	for(U32 lod = 0; lod < m_header.m_lodCount; ++lod)
 	{
-		m_subMeshes.create(alloc, m_header.m_subMeshCount);
-		ANKI_CHECK(m_file->read(&m_subMeshes[0], m_subMeshes.getSizeInBytes()));
-
-		// Checks
-		const U32 indicesPerFace = !!(m_header.m_flags & MeshBinaryFlag::QUAD) ? 4 : 3;
 		U idxSum = 0;
 		for(U32 i = 0; i < m_subMeshes.getSize(); i++)
 		{
 			const MeshBinarySubMesh& sm = m_subMeshes[i];
-			if(sm.m_firstIndex != idxSum || (sm.m_indexCount % indicesPerFace) != 0)
+			if(sm.m_firstIndices[lod] != idxSum || (sm.m_indexCounts[lod] % indicesPerFace) != 0)
 			{
 				ANKI_RESOURCE_LOGE("Incorrect sub mesh info");
 				return Error::USER_DATA;
@@ -48,17 +53,17 @@ Error MeshBinaryLoader::load(const ResourceFilename& filename)
 			{
 				if(sm.m_aabbMin[d] >= sm.m_aabbMax[d])
 				{
-					ANKI_RESOURCE_LOGE("Wrong bounding box");
+					ANKI_RESOURCE_LOGE("Wrong submesh bounding box");
 					return Error::USER_DATA;
 				}
 			}
 
-			idxSum += sm.m_indexCount;
+			idxSum += sm.m_indexCounts[lod];
 		}
 
-		if(idxSum != m_header.m_totalIndexCount)
+		if(idxSum != m_header.m_totalIndexCounts[lod])
 		{
-			ANKI_RESOURCE_LOGE("Incorrect sub mesh info");
+			ANKI_RESOURCE_LOGE("Submesh index cound doesn't add up to the total");
 			return Error::USER_DATA;
 		}
 	}
@@ -66,10 +71,11 @@ Error MeshBinaryLoader::load(const ResourceFilename& filename)
 	return Error::NONE;
 }
 
-Error MeshBinaryLoader::checkFormat(VertexAttributeId type, ConstWeakArray<Format> supportedFormats,
-									U32 vertexBufferIdx, U32 relativeOffset) const
+Error MeshBinaryLoader::checkFormat(VertexStreamId stream, ConstWeakArray<Format> supportedFormats) const
 {
-	const MeshBinaryVertexAttribute& attrib = m_header.m_vertexAttributes[type];
+	const U32 vertexAttribIdx = U32(stream);
+	const U32 vertexBufferIdx = vertexAttribIdx;
+	const MeshBinaryVertexAttribute& attrib = m_header.m_vertexAttributes[vertexAttribIdx];
 
 	// Check format
 	Bool found = false;
@@ -84,8 +90,8 @@ Error MeshBinaryLoader::checkFormat(VertexAttributeId type, ConstWeakArray<Forma
 
 	if(!found)
 	{
-		ANKI_RESOURCE_LOGE("Vertex attribute %u has unsupported format %u", U32(type),
-						   U32(m_header.m_vertexAttributes[type].m_format));
+		ANKI_RESOURCE_LOGE("Vertex attribute %u has unsupported format %s", vertexAttribIdx,
+						   getFormatInfo(attrib.m_format).m_name);
 		return Error::USER_DATA;
 	}
 
@@ -97,21 +103,29 @@ Error MeshBinaryLoader::checkFormat(VertexAttributeId type, ConstWeakArray<Forma
 
 	if(attrib.m_bufferBinding != vertexBufferIdx)
 	{
-		ANKI_RESOURCE_LOGE("Vertex attribute %u should belong to the %u vertex buffer", U32(type), vertexBufferIdx);
+		ANKI_RESOURCE_LOGE("Vertex attribute %u should belong to the %u vertex buffer", vertexAttribIdx,
+						   vertexBufferIdx);
 		return Error::USER_DATA;
 	}
 
-	if(attrib.m_relativeOffset != relativeOffset)
+	if(attrib.m_relativeOffset != 0)
 	{
-		ANKI_RESOURCE_LOGE("Vertex attribute %u should have relative vertex offset equal to %u", U32(type),
-						   relativeOffset);
+		ANKI_RESOURCE_LOGE("Vertex attribute %u should have relative vertex offset equal to 0", vertexAttribIdx);
 		return Error::USER_DATA;
 	}
 
 	// Scale should be 1.0 for now
 	if(attrib.m_scale != 1.0f)
 	{
-		ANKI_RESOURCE_LOGE("Vertex attribute %u should have 1.0 scale", U32(type));
+		ANKI_RESOURCE_LOGE("Vertex attribute %u should have 1.0 scale", vertexAttribIdx);
+		return Error::USER_DATA;
+	}
+
+	const U32 vertexBufferStride = getFormatInfo(attrib.m_format).m_texelSize;
+	if(m_header.m_vertexBuffers[vertexBufferIdx].m_vertexStride != vertexBufferStride)
+	{
+		ANKI_RESOURCE_LOGE("Vertex buffer %u doesn't have the expected stride of %u", vertexBufferIdx,
+						   vertexBufferStride);
 		return Error::USER_DATA;
 	}
 
@@ -137,27 +151,42 @@ Error MeshBinaryLoader::checkHeader() const
 	}
 
 	// Attributes
-	ANKI_CHECK(checkFormat(VertexAttributeId::POSITION, Array<Format, 1>{{Format::R32G32B32_SFLOAT}}, 0, 0));
-	ANKI_CHECK(checkFormat(VertexAttributeId::NORMAL, Array<Format, 1>{{Format::A2B10G10R10_SNORM_PACK32}}, 1, 0));
-	ANKI_CHECK(checkFormat(VertexAttributeId::TANGENT, Array<Format, 1>{{Format::A2B10G10R10_SNORM_PACK32}}, 1, 4));
-	ANKI_CHECK(checkFormat(VertexAttributeId::UV0, Array<Format, 1>{{Format::R32G32_SFLOAT}}, 1, 8));
-	ANKI_CHECK(checkFormat(VertexAttributeId::UV1, Array<Format, 1>{{Format::NONE}}, 1, 0));
+	ANKI_CHECK(checkFormat(VertexStreamId::POSITIONS,
+						   Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::POSITIONS]}}));
+	ANKI_CHECK(checkFormat(VertexStreamId::NORMALS,
+						   Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::NORMALS]}}));
+	ANKI_CHECK(checkFormat(VertexStreamId::TANGENTS,
+						   Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::TANGENTS]}}));
 	ANKI_CHECK(
-		checkFormat(VertexAttributeId::BONE_INDICES, Array<Format, 2>{{Format::NONE, Format::R8G8B8A8_UINT}}, 2, 0));
+		checkFormat(VertexStreamId::UVS, Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::UVS]}}));
+	ANKI_CHECK(checkFormat(VertexStreamId::BONE_IDS,
+						   Array<Format, 2>{{Format::NONE, REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::BONE_IDS]}}));
 	ANKI_CHECK(
-		checkFormat(VertexAttributeId::BONE_WEIGHTS, Array<Format, 2>{{Format::NONE, Format::R8G8B8A8_UNORM}}, 2, 4));
+		checkFormat(VertexStreamId::BONE_WEIGHTS,
+					Array<Format, 2>{{Format::NONE, REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::BONE_WEIGHTS]}}));
 
 	// Vertex buffers
-	if(m_header.m_vertexBufferCount != 2 + U32(hasBoneInfo()))
+	const Format boneIdxFormat = m_header.m_vertexAttributes[VertexStreamId::BONE_IDS].m_format;
+	const Format boneWeightsFormat = m_header.m_vertexAttributes[VertexStreamId::BONE_WEIGHTS].m_format;
+	if((boneIdxFormat == Format::NONE && boneWeightsFormat != Format::NONE)
+	   || (boneWeightsFormat == Format::NONE && boneIdxFormat != Format::NONE))
+	{
+		ANKI_RESOURCE_LOGE("Bone buffers are partially present");
+		return Error::USER_DATA;
+	}
+
+	const Bool hasBoneBuffers = boneIdxFormat != Format::NONE && boneWeightsFormat != Format::NONE;
+
+	if(m_header.m_vertexBufferCount != 4 + hasBoneBuffers * 2)
 	{
 		ANKI_RESOURCE_LOGE("Wrong number of vertex buffers");
 		return Error::USER_DATA;
 	}
 
-	if(m_header.m_vertexBuffers[0].m_vertexStride != sizeof(Vec3) || m_header.m_vertexBuffers[1].m_vertexStride != 16
-	   || (hasBoneInfo() && m_header.m_vertexBuffers[2].m_vertexStride != 8))
+	// LOD
+	if(h.m_lodCount == 0 || h.m_lodCount >= MAX_LOD_COUNT)
 	{
-		ANKI_RESOURCE_LOGE("Some of the vertex buffers have incorrect vertex stride");
+		ANKI_RESOURCE_LOGE("Wrong LOD count");
 		return Error::USER_DATA;
 	}
 
@@ -169,18 +198,24 @@ Error MeshBinaryLoader::checkHeader() const
 	}
 
 	// m_totalIndexCount
-	const U indicesPerFace = !!(h.m_flags & MeshBinaryFlag::QUAD) ? 4 : 3;
-	if(h.m_totalIndexCount == 0 || (h.m_totalIndexCount % indicesPerFace) != 0)
+	for(U32 lod = 0; lod < h.m_lodCount; ++lod)
 	{
-		ANKI_RESOURCE_LOGE("Wrong index count");
-		return Error::USER_DATA;
+		const U indicesPerFace = !!(h.m_flags & MeshBinaryFlag::QUAD) ? 4 : 3;
+		if(h.m_totalIndexCounts[lod] == 0 || (h.m_totalIndexCounts[lod] % indicesPerFace) != 0)
+		{
+			ANKI_RESOURCE_LOGE("Wrong index count");
+			return Error::USER_DATA;
+		}
 	}
 
 	// m_totalVertexCount
-	if(h.m_totalVertexCount == 0)
+	for(U32 lod = 0; lod < h.m_lodCount; ++lod)
 	{
-		ANKI_RESOURCE_LOGE("Wrong vertex count");
-		return Error::USER_DATA;
+		if(h.m_totalVertexCounts[lod] == 0)
+		{
+			ANKI_RESOURCE_LOGE("Wrong vertex count");
+			return Error::USER_DATA;
+		}
 	}
 
 	// m_subMeshCount
@@ -202,13 +237,11 @@ Error MeshBinaryLoader::checkHeader() const
 
 	// Check the file size
 	PtrSize totalSize = sizeof(m_header);
-
 	totalSize += sizeof(MeshBinarySubMesh) * m_header.m_subMeshCount;
-	totalSize += getAlignedIndexBufferSize();
 
-	for(U32 i = 0; i < m_header.m_vertexBufferCount; ++i)
+	for(U32 lod = 0; lod < h.m_lodCount; ++lod)
 	{
-		totalSize += getAlignedVertexBufferSize(i);
+		totalSize += getLodBuffersSize(lod);
 	}
 
 	if(totalSize != m_file->getSize())
@@ -220,30 +253,17 @@ Error MeshBinaryLoader::checkHeader() const
 	return Error::NONE;
 }
 
-Error MeshBinaryLoader::storeIndexBuffer(void* ptr, PtrSize size)
+Error MeshBinaryLoader::storeIndexBuffer(U32 lod, void* ptr, PtrSize size)
 {
 	ANKI_ASSERT(ptr);
 	ANKI_ASSERT(isLoaded());
-	ANKI_ASSERT(size == getIndexBufferSize());
+	ANKI_ASSERT(lod < m_header.m_lodCount);
+	ANKI_ASSERT(size == getIndexBufferSize(lod));
 
-	const PtrSize seek = sizeof(m_header) + m_subMeshes.getSizeInBytes();
-	ANKI_CHECK(m_file->seek(seek, FileSeekOrigin::BEGINNING));
-	ANKI_CHECK(m_file->read(ptr, size));
-
-	return Error::NONE;
-}
-
-Error MeshBinaryLoader::storeVertexBuffer(U32 bufferIdx, void* ptr, PtrSize size)
-{
-	ANKI_ASSERT(ptr);
-	ANKI_ASSERT(isLoaded());
-	ANKI_ASSERT(bufferIdx < m_header.m_vertexBufferCount);
-	ANKI_ASSERT(size == getVertexBufferSize(bufferIdx));
-
-	PtrSize seek = sizeof(m_header) + m_subMeshes.getSizeInBytes() + getAlignedIndexBufferSize();
-	for(U32 i = 0; i < bufferIdx; ++i)
+	PtrSize seek = sizeof(m_header) + m_subMeshes.getSizeInBytes();
+	for(U32 l = lod + 1; l < m_header.m_lodCount; ++l)
 	{
-		seek += getAlignedVertexBufferSize(i);
+		seek += getLodBuffersSize(l);
 	}
 
 	ANKI_CHECK(m_file->seek(seek, FileSeekOrigin::BEGINNING));
@@ -252,22 +272,52 @@ Error MeshBinaryLoader::storeVertexBuffer(U32 bufferIdx, void* ptr, PtrSize size
 	return Error::NONE;
 }
 
-Error MeshBinaryLoader::storeIndicesAndPosition(DynamicArrayAuto<U32>& indices, DynamicArrayAuto<Vec3>& positions)
+Error MeshBinaryLoader::storeVertexBuffer(U32 lod, U32 bufferIdx, void* ptr, PtrSize size)
+{
+	ANKI_ASSERT(ptr);
+	ANKI_ASSERT(isLoaded());
+	ANKI_ASSERT(bufferIdx < m_header.m_vertexBufferCount);
+	ANKI_ASSERT(size == getVertexBufferSize(lod, bufferIdx));
+	ANKI_ASSERT(lod < m_header.m_lodCount);
+
+	PtrSize seek = sizeof(m_header) + m_subMeshes.getSizeInBytes();
+
+	for(U32 l = lod + 1; l < m_header.m_lodCount; ++l)
+	{
+		seek += getLodBuffersSize(l);
+	}
+
+	seek += getIndexBufferSize(lod);
+
+	for(U32 i = 0; i < bufferIdx; ++i)
+	{
+		seek += getVertexBufferSize(lod, i);
+	}
+
+	ANKI_CHECK(m_file->seek(seek, FileSeekOrigin::BEGINNING));
+	ANKI_CHECK(m_file->read(ptr, size));
+
+	return Error::NONE;
+}
+
+Error MeshBinaryLoader::storeIndicesAndPosition(U32 lod, DynamicArrayAuto<U32>& indices,
+												DynamicArrayAuto<Vec3>& positions)
 {
 	ANKI_ASSERT(isLoaded());
+	ANKI_ASSERT(lod < m_header.m_lodCount);
 
 	// Store indices
 	{
-		indices.resize(m_header.m_totalIndexCount);
+		indices.resize(m_header.m_totalIndexCounts[lod]);
 
 		// Store to staging buff
 		DynamicArrayAuto<U8, PtrSize> staging(m_alloc);
-		staging.create(getIndexBufferSize());
-		ANKI_CHECK(storeIndexBuffer(&staging[0], staging.getSizeInBytes()));
+		staging.create(getIndexBufferSize(lod));
+		ANKI_CHECK(storeIndexBuffer(lod, &staging[0], staging.getSizeInBytes()));
 
 		// Copy from staging
 		ANKI_ASSERT(m_header.m_indexType == IndexType::U16);
-		for(U32 i = 0; i < m_header.m_totalIndexCount; ++i)
+		for(U32 i = 0; i < m_header.m_totalIndexCounts[lod]; ++i)
 		{
 			indices[i] = *reinterpret_cast<U16*>(&staging[PtrSize(i) * 2]);
 		}
@@ -275,13 +325,25 @@ Error MeshBinaryLoader::storeIndicesAndPosition(DynamicArrayAuto<U32>& indices, 
 
 	// Store positions
 	{
-		positions.resize(m_header.m_totalVertexCount);
-		const MeshBinaryVertexAttribute& attrib = m_header.m_vertexAttributes[VertexAttributeId::POSITION];
-		ANKI_ASSERT(attrib.m_format == Format::R32G32B32_SFLOAT);
-		ANKI_CHECK(storeVertexBuffer(attrib.m_bufferBinding, &positions[0], positions.getSizeInBytes()));
+		positions.resize(m_header.m_totalVertexCounts[lod]);
+		const MeshBinaryVertexAttribute& attrib = m_header.m_vertexAttributes[VertexStreamId::POSITIONS];
+		ANKI_CHECK(storeVertexBuffer(lod, attrib.m_bufferBinding, &positions[0], positions.getSizeInBytes()));
 	}
 
 	return Error::NONE;
+}
+
+PtrSize MeshBinaryLoader::getLodBuffersSize(U32 lod) const
+{
+	ANKI_ASSERT(lod < m_header.m_lodCount);
+
+	PtrSize size = getIndexBufferSize(lod);
+	for(U32 vertBufferIdx = 0; vertBufferIdx < m_header.m_vertexBufferCount; ++vertBufferIdx)
+	{
+		size += getVertexBufferSize(lod, vertBufferIdx);
+	}
+
+	return size;
 }
 
 } // end namespace anki

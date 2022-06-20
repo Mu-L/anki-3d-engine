@@ -30,7 +30,7 @@ Error CpuMeshResource::load(const ResourceFilename& filename, [[maybe_unused]] B
 	DynamicArrayAuto<Vec3> tempPositions(getAllocator());
 	DynamicArrayAuto<U32> tempIndices(getAllocator());
 
-	ANKI_CHECK(loader.storeIndicesAndPosition(tempIndices, tempPositions));
+	ANKI_CHECK(loader.storeIndicesAndPosition(0, tempIndices, tempPositions));
 
 	m_indices = std::move(tempIndices);
 	m_positions = std::move(tempPositions);
