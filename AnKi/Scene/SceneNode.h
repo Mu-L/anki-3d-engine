@@ -273,6 +273,8 @@ protected:
 
 	ResourceManager& getResourceManager();
 
+	const ResourceManager& getResourceManager() const;
+
 private:
 	/// This class packs a few info used by components.
 	class ComponentsArrayElement

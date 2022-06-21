@@ -72,6 +72,11 @@ ResourceManager& SceneNode::getResourceManager()
 	return m_scene->getResourceManager();
 }
 
+const ResourceManager& SceneNode::getResourceManager() const
+{
+	return m_scene->getResourceManager();
+}
+
 const ConfigSet& SceneNode::getConfig() const
 {
 	return m_scene->getConfig();

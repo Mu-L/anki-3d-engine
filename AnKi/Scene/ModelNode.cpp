@@ -262,24 +262,24 @@ void ModelNode::draw(RenderQueueDrawContext& ctx, ConstWeakArray<void*> userData
 			ConstWeakArray<Mat3x4>(&trfs[0], instanceCount), ConstWeakArray<Mat3x4>(&prevTrfs[0], instanceCount),
 			*ctx.m_stagingGpuAllocator);
 
-		// Set attributes
-		for(U i = 0; i < modelInf.m_vertexAttributeCount; ++i)
+		// Set vertex streams
+		for(VertexStreamId stream : EnumIterable<VertexStreamId>())
 		{
-			const ModelVertexAttribute& attrib = modelInf.m_vertexAttributes[i];
-			ANKI_ASSERT(attrib.m_format != Format::NONE);
-			cmdb->setVertexAttribute(U32(attrib.m_location), attrib.m_bufferBinding, attrib.m_format,
-									 attrib.m_relativeOffset);
-		}
+			if(modelInf.m_vertexBufferOffsets[stream] == MAX_PTR_SIZE)
+			{
+				continue;
+			}
 
-		// Set vertex buffers
-		for(U32 i = 0; i < modelInf.m_vertexBufferBindingCount; ++i)
-		{
-			const ModelVertexBufferBinding& binding = modelInf.m_vertexBufferBindings[i];
-			cmdb->bindVertexBuffer(i, binding.m_buffer, binding.m_offset, binding.m_stride, VertexStepRate::VERTEX);
+			cmdb->setVertexAttribute(U32(stream), U32(stream), REGULAR_VERTEX_STREAM_FORMATS[stream], 0);
+
+			cmdb->bindVertexBuffer(U32(stream), getResourceManager().getVertexGpuMemory().getVertexBuffer(),
+								   modelInf.m_vertexBufferOffsets[stream],
+								   getFormatInfo(REGULAR_VERTEX_STREAM_FORMATS[stream]).m_texelSize);
 		}
 
 		// Index buffer
-		cmdb->bindIndexBuffer(modelInf.m_indexBuffer, modelInf.m_indexBufferOffset, IndexType::U16);
+		cmdb->bindIndexBuffer(getResourceManager().getVertexGpuMemory().getVertexBuffer(), modelInf.m_indexBufferOffset,
+							  IndexType::U16);
 
 		// Draw
 		cmdb->drawElements(PrimitiveTopology::TRIANGLES, modelInf.m_indexCount, instanceCount, modelInf.m_firstIndex, 0,
@@ -402,15 +402,6 @@ void ModelNode::setupRayTracingInstanceQueueElement(U32 lod, U32 modelPatchIdx,
 	el.m_transform = Mat3x4(movec.getWorldTransform());
 
 	el.m_shaderGroupHandleIndex = info.m_shaderGroupHandleIndex;
-
-	// References
-	el.m_grObjectCount = info.m_grObjectReferences.getSize();
-	for(U32 i = 0; i < el.m_grObjectCount; ++i)
-	{
-		// const_cast hack follows. To avoid the const you could copy m_grObjectReferences[i] to a GrObjectPtr and then
-		// call get() on that. But that will cost 2 atomic operations
-		el.m_grObjects[i] = const_cast<GrObject*>(info.m_grObjectReferences[i].get());
-	}
 }
 
 } // end namespace anki

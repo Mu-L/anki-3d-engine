@@ -11,7 +11,11 @@ ANKI_BEGIN_NAMESPACE
 
 struct LodInfo
 {
+#if defined(__cplusplus)
+	Array<U32, U32(VertexStreamId::COUNT)> m_baseVertex;
+#else
 	U32 m_baseVertex[MAX_VERTEX_STREAM_COUNT];
+#endif
 	U32 m_baseIndex;
 	U32 m_indexCount;
 };

@@ -206,6 +206,12 @@ public:
 		return *m_vertexMem;
 	}
 
+	const VertexGpuMemoryPool& getVertexGpuMemory() const
+	{
+		ANKI_ASSERT(m_vertexMem);
+		return *m_vertexMem;
+	}
+
 	const ConfigSet& getConfig() const
 	{
 		ANKI_ASSERT(m_config);
