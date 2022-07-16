@@ -356,4 +356,9 @@ Error SceneGraph::updateNodes(UpdateSceneNodesCtx& ctx) const
 	return err;
 }
 
+const VertexGpuMemoryPool& SceneGraph::getVertexGpuMemory() const
+{
+	return m_resources->getVertexGpuMemory();
+}
+
 } // end namespace anki

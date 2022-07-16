@@ -151,18 +151,14 @@ Error MeshBinaryLoader::checkHeader() const
 	}
 
 	// Attributes
-	ANKI_CHECK(checkFormat(VertexStreamId::POSITION,
-						   Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::POSITION]}}));
-	ANKI_CHECK(
-		checkFormat(VertexStreamId::NORMAL, Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::NORMAL]}}));
-	ANKI_CHECK(checkFormat(VertexStreamId::TANGENT,
-						   Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::TANGENT]}}));
-	ANKI_CHECK(checkFormat(VertexStreamId::UV, Array<Format, 1>{{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::UV]}}));
+	ANKI_CHECK(checkFormat(VertexStreamId::POSITION, Array{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::POSITION]}));
+	ANKI_CHECK(checkFormat(VertexStreamId::NORMAL, Array{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::NORMAL]}));
+	ANKI_CHECK(checkFormat(VertexStreamId::TANGENT, Array{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::TANGENT]}));
+	ANKI_CHECK(checkFormat(VertexStreamId::UV, Array{REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::UV]}));
 	ANKI_CHECK(checkFormat(VertexStreamId::BONE_IDS,
-						   Array<Format, 2>{{Format::NONE, REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::BONE_IDS]}}));
-	ANKI_CHECK(
-		checkFormat(VertexStreamId::BONE_WEIGHTS,
-					Array<Format, 2>{{Format::NONE, REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::BONE_WEIGHTS]}}));
+						   Array{Format::NONE, REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::BONE_IDS]}));
+	ANKI_CHECK(checkFormat(VertexStreamId::BONE_WEIGHTS,
+						   Array{Format::NONE, REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::BONE_WEIGHTS]}));
 
 	// Vertex buffers
 	const Format boneIdxFormat = m_header.m_vertexAttributes[VertexStreamId::BONE_IDS].m_format;

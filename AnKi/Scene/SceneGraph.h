@@ -169,6 +169,8 @@ public:
 		return *m_resources;
 	}
 
+	const VertexGpuMemoryPool& getVertexGpuMemory() const;
+
 	GrManager& getGrManager()
 	{
 		return *m_gr;
