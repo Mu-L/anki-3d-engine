@@ -32,7 +32,7 @@ ANKI_ENUM_ALLOW_NUMERIC_OPERATIONS(MeshBinaryFlag)
 class MeshBinaryVertexBuffer
 {
 public:
-	/// The size of the vertex.
+	/// The size of the vertex. It's zero if the buffer is not present.
 	U32 m_vertexStride;
 
 	template<typename TSerializer, typename TClass>
@@ -94,6 +94,8 @@ class MeshBinarySubMesh
 public:
 	Array<U32, MAX_LOD_COUNT> m_firstIndices;
 	Array<U32, MAX_LOD_COUNT> m_indexCounts;
+	Array<U32, MAX_LOD_COUNT> m_firstVertices;
+	Array<U32, MAX_LOD_COUNT> m_vertexCounts;
 
 	/// Bounding box min.
 	Vec3 m_aabbMin;
@@ -108,6 +110,10 @@ public:
 				  self.m_firstIndices.getSize());
 		s.doArray("m_indexCounts", offsetof(MeshBinarySubMesh, m_indexCounts), &self.m_indexCounts[0],
 				  self.m_indexCounts.getSize());
+		s.doArray("m_firstVertices", offsetof(MeshBinarySubMesh, m_firstVertices), &self.m_firstVertices[0],
+				  self.m_firstVertices.getSize());
+		s.doArray("m_vertexCounts", offsetof(MeshBinarySubMesh, m_vertexCounts), &self.m_vertexCounts[0],
+				  self.m_vertexCounts.getSize());
 		s.doValue("m_aabbMin", offsetof(MeshBinarySubMesh, m_aabbMin), self.m_aabbMin);
 		s.doValue("m_aabbMax", offsetof(MeshBinarySubMesh, m_aabbMax), self.m_aabbMax);
 	}
@@ -132,7 +138,6 @@ public:
 	Array<U8, 8> m_magic;
 	MeshBinaryFlag m_flags;
 	Array<MeshBinaryVertexBuffer, MAX_VERTEX_ATTRIBUTES> m_vertexBuffers;
-	U32 m_vertexBufferCount;
 	Array<MeshBinaryVertexAttribute, MAX_VERTEX_ATTRIBUTES> m_vertexAttributes;
 	IndexType m_indexType;
 	Array<U8, 3> m_padding;
@@ -154,7 +159,6 @@ public:
 		s.doValue("m_flags", offsetof(MeshBinaryHeader, m_flags), self.m_flags);
 		s.doArray("m_vertexBuffers", offsetof(MeshBinaryHeader, m_vertexBuffers), &self.m_vertexBuffers[0],
 				  self.m_vertexBuffers.getSize());
-		s.doValue("m_vertexBufferCount", offsetof(MeshBinaryHeader, m_vertexBufferCount), self.m_vertexBufferCount);
 		s.doArray("m_vertexAttributes", offsetof(MeshBinaryHeader, m_vertexAttributes), &self.m_vertexAttributes[0],
 				  self.m_vertexAttributes.getSize());
 		s.doValue("m_indexType", offsetof(MeshBinaryHeader, m_indexType), self.m_indexType);

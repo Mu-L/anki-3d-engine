@@ -129,13 +129,13 @@ private:
 
 	// Compute filenames for various resources. Use a hash to solve the casing issue and remove unwanted special chars
 	StringAuto computeModelResourceFilename(const cgltf_mesh& mesh) const;
-	StringAuto computeMeshResourceFilename(const cgltf_mesh& mesh, U32 lod = 0) const;
+	StringAuto computeMeshResourceFilename(const cgltf_mesh& mesh) const;
 	StringAuto computeMaterialResourceFilename(const cgltf_material& mtl) const;
 	StringAuto computeAnimationResourceFilename(const cgltf_animation& anim) const;
 	StringAuto computeSkeletonResourceFilename(const cgltf_skin& skin) const;
 
 	// Resources
-	Error writeMesh(const cgltf_mesh& mesh, U32 lod, F32 decimateFactor);
+	Error writeMesh(const cgltf_mesh& mesh);
 	Error writeMaterial(const cgltf_material& mtl, Bool writeRayTracing);
 	Error writeModel(const cgltf_mesh& mesh);
 	Error writeAnimation(const cgltf_animation& anim);

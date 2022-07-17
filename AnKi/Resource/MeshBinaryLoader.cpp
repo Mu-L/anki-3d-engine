@@ -170,14 +170,6 @@ Error MeshBinaryLoader::checkHeader() const
 		return Error::USER_DATA;
 	}
 
-	const Bool hasBoneBuffers = boneIdxFormat != Format::NONE && boneWeightsFormat != Format::NONE;
-
-	if(m_header.m_vertexBufferCount != 4 + hasBoneBuffers * 2)
-	{
-		ANKI_RESOURCE_LOGE("Wrong number of vertex buffers");
-		return Error::USER_DATA;
-	}
-
 	// LOD
 	if(h.m_lodCount == 0 || h.m_lodCount >= MAX_LOD_COUNT)
 	{
@@ -271,7 +263,6 @@ Error MeshBinaryLoader::storeVertexBuffer(U32 lod, U32 bufferIdx, void* ptr, Ptr
 {
 	ANKI_ASSERT(ptr);
 	ANKI_ASSERT(isLoaded());
-	ANKI_ASSERT(bufferIdx < m_header.m_vertexBufferCount);
 	ANKI_ASSERT(size == getVertexBufferSize(lod, bufferIdx));
 	ANKI_ASSERT(lod < m_header.m_lodCount);
 
@@ -333,9 +324,12 @@ PtrSize MeshBinaryLoader::getLodBuffersSize(U32 lod) const
 	ANKI_ASSERT(lod < m_header.m_lodCount);
 
 	PtrSize size = getIndexBufferSize(lod);
-	for(U32 vertBufferIdx = 0; vertBufferIdx < m_header.m_vertexBufferCount; ++vertBufferIdx)
+	for(U32 vertBufferIdx = 0; vertBufferIdx < m_header.m_vertexBuffers.getSize(); ++vertBufferIdx)
 	{
-		size += getVertexBufferSize(lod, vertBufferIdx);
+		if(m_header.m_vertexBuffers[vertBufferIdx].m_vertexStride > 0)
+		{
+			size += getVertexBufferSize(lod, vertBufferIdx);
+		}
 	}
 
 	return size;

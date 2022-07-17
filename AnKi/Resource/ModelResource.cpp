@@ -47,8 +47,8 @@ void ModelPatch::getRayTracingInfo(const RenderingKey& key, ModelRayTracingInfo&
 	info.m_shaderGroupHandleIndex = variant.getRtShaderGroupHandleIndex();
 }
 
-Error ModelPatch::init(ModelResource* model, CString meshFName, const CString& mtlFName, U32 subMeshIndex, Bool async,
-					   ResourceManager* manager)
+Error ModelPatch::init([[maybe_unused]] ModelResource* model, CString meshFName, const CString& mtlFName,
+					   U32 subMeshIndex, Bool async, ResourceManager* manager)
 {
 #if ANKI_ENABLE_ASSERTIONS
 	m_model = model;

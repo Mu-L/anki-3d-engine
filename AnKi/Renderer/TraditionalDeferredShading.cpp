@@ -84,23 +84,20 @@ void TraditionalDeferredLightShading::bindVertexIndexBuffers(MeshResourcePtr& me
 															 U32& indexCount)
 {
 	// Attrib
-	U32 bufferBinding;
-	Format fmt;
-	U32 relativeOffset;
-	mesh->getVertexAttributeInfo(VertexAttributeId::POSITION, bufferBinding, fmt, relativeOffset);
+	const Format fmt = REGULAR_VERTEX_STREAM_FORMATS[VertexStreamId::POSITION];
+	PtrSize offset;
+	U32 vertCount;
+	mesh->getVertexStreamInfo(0, VertexStreamId::POSITION, offset, vertCount);
 
-	cmdb->setVertexAttribute(0, 0, fmt, relativeOffset);
+	cmdb->setVertexAttribute(0, 0, fmt, 0);
 
 	// Vert buff
-	BufferPtr buff;
-	PtrSize offset, stride;
-	mesh->getVertexBufferInfo(bufferBinding, buff, offset, stride);
-
-	cmdb->bindVertexBuffer(0, buff, offset, stride);
+	BufferPtr buff = mesh->getManager().getVertexGpuMemory().getVertexBuffer();
+	cmdb->bindVertexBuffer(0, buff, offset, sizeof(Vec3));
 
 	// Idx buff
 	IndexType idxType;
-	mesh->getIndexBufferInfo(buff, offset, indexCount, idxType);
+	mesh->getIndexBufferInfo(0, offset, indexCount, idxType);
 
 	cmdb->bindIndexBuffer(buff, offset, idxType);
 }

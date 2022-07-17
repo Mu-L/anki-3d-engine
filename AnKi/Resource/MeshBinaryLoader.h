@@ -81,7 +81,6 @@ private:
 	{
 		ANKI_ASSERT(isLoaded());
 		ANKI_ASSERT(lod < m_header.m_lodCount);
-		ANKI_ASSERT(bufferIdx < m_header.m_vertexBufferCount);
 		return PtrSize(m_header.m_totalVertexCounts[lod]) * PtrSize(m_header.m_vertexBuffers[bufferIdx].m_vertexStride);
 	}
 

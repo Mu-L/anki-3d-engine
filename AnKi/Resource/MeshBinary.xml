@@ -24,7 +24,7 @@ ANKI_ENUM_ALLOW_NUMERIC_OPERATIONS(MeshBinaryFlag)
 	<classes>
 		<class name="MeshBinaryVertexBuffer" comment="Vertex buffer info">
 			<members>
-				<member name="m_vertexStride" type="U32" comment="The size of the vertex"/>
+				<member name="m_vertexStride" type="U32" comment="The size of the vertex. It's zero if the buffer is not present"/>
 			</members>
 		</class>
 
@@ -41,6 +41,8 @@ ANKI_ENUM_ALLOW_NUMERIC_OPERATIONS(MeshBinaryFlag)
 			<members>
 				<member name="m_firstIndices" type="U32" array_size="MAX_LOD_COUNT"/>
 				<member name="m_indexCounts" type="U32" array_size="MAX_LOD_COUNT"/>
+				<member name="m_firstVertices" type="U32" array_size="MAX_LOD_COUNT"/>
+				<member name="m_vertexCounts" type="U32" array_size="MAX_LOD_COUNT"/>
 				<member name="m_aabbMin" type="Vec3" comment="Bounding box min"/>
 				<member name="m_aabbMax" type="Vec3" comment="Bounding box max"/>
 			</members>
@@ -51,7 +53,6 @@ ANKI_ENUM_ALLOW_NUMERIC_OPERATIONS(MeshBinaryFlag)
 				<member name="m_magic" type="U8" array_size="8"/>
 				<member name="m_flags" type="MeshBinaryFlag"/>
 				<member name="m_vertexBuffers" type="MeshBinaryVertexBuffer" array_size="MAX_VERTEX_ATTRIBUTES"/>
-				<member name="m_vertexBufferCount" type="U32"/>
 				<member name="m_vertexAttributes" type="MeshBinaryVertexAttribute" array_size="MAX_VERTEX_ATTRIBUTES"/>
 				<member name="m_indexType" type="IndexType"/>
 				<member name="m_padding" type="U8" array_size="3"/>

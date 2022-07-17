@@ -3167,6 +3167,17 @@ public:
 		return max(minv).min(maxv);
 	}
 
+	ANKI_ENABLE_METHOD(!IS_INTEGER)
+	TVec round() const
+	{
+		TVec out;
+		for(U i = 0; i < N; ++i)
+		{
+			out[i] = ::round(m_arr[i]);
+		}
+		return out;
+	}
+
 	/// Get the min of all components.
 	ANKI_ENABLE_METHOD(!HAS_VEC4_SIMD)
 	TVec min(const TVec& b) const

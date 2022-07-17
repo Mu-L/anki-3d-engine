@@ -716,20 +716,7 @@ Error GltfImporter::visitNode(const cgltf_node& node, const Transform& parentTrf
 							   [[maybe_unused]] ThreadHiveSemaphore* signalSemaphore) {
 				Ctx& self = *static_cast<Ctx*>(userData);
 
-				// LOD 0
-				Error err = self.m_importer->writeMesh(*self.m_mesh, 0, self.m_importer->computeLodFactor(0));
-
-				// LOD 1
-				if(!err && self.m_importer->m_lodCount > 1 && !self.m_importer->skipMeshLod(*self.m_mesh, 1))
-				{
-					err = self.m_importer->writeMesh(*self.m_mesh, 1, self.m_importer->computeLodFactor(1));
-				}
-
-				// LOD 2
-				if(!err && self.m_importer->m_lodCount > 2 && !self.m_importer->skipMeshLod(*self.m_mesh, 2))
-				{
-					err = self.m_importer->writeMesh(*self.m_mesh, 2, self.m_importer->computeLodFactor(2));
-				}
+				Error err = self.m_importer->writeMesh(*self.m_mesh);
 
 				for(U32 i = 0; i < self.m_materialCount && !err; ++i)
 				{
@@ -776,7 +763,7 @@ Error GltfImporter::visitNode(const cgltf_node& node, const Transform& parentTrf
 
 				ANKI_CHECK(m_sceneFile.writeText("comp = node2:getSceneNodeBase():getBodyComponent()\n"));
 
-				const StringAuto meshFname = computeMeshResourceFilename(*node.mesh, maxLod);
+				const StringAuto meshFname = computeMeshResourceFilename(*node.mesh);
 
 				ANKI_CHECK(
 					m_sceneFile.writeTextf("comp:loadMeshResource(\"%s%s\")\n", m_rpath.cstr(), meshFname.cstr()));
@@ -858,18 +845,6 @@ Error GltfImporter::writeModel(const cgltf_mesh& mesh)
 		{
 			const StringAuto meshFname = computeMeshResourceFilename(mesh);
 			ANKI_CHECK(file.writeTextf("\t\t\t<mesh>%s%s</mesh>\n", m_rpath.cstr(), meshFname.cstr()));
-		}
-
-		if(m_lodCount > 1 && !skipMeshLod(mesh, 1))
-		{
-			const StringAuto meshFname = computeMeshResourceFilename(mesh, 1);
-			ANKI_CHECK(file.writeTextf("\t\t\t<mesh1>%s%s</mesh1>\n", m_rpath.cstr(), meshFname.cstr()));
-		}
-
-		if(m_lodCount > 2 && !skipMeshLod(mesh, 2))
-		{
-			const StringAuto meshFname = computeMeshResourceFilename(mesh, 2);
-			ANKI_CHECK(file.writeTextf("\t\t\t<mesh2>%s%s</mesh2>\n", m_rpath.cstr(), meshFname.cstr()));
 		}
 
 		HashMapAuto<CString, StringAuto> materialExtras(m_alloc);
@@ -1472,14 +1447,11 @@ StringAuto GltfImporter::computeModelResourceFilename(const cgltf_mesh& mesh) co
 	return out;
 }
 
-StringAuto GltfImporter::computeMeshResourceFilename(const cgltf_mesh& mesh, U32 lod) const
+StringAuto GltfImporter::computeMeshResourceFilename(const cgltf_mesh& mesh) const
 {
 	const U64 hash = computeHash(mesh.name, strlen(mesh.name));
-
 	StringAuto out(m_alloc);
-
-	out.sprintf("%.64s_lod%u_%" PRIx64 ".ankimesh", mesh.name, lod, hash); // Limit the filename size
-
+	out.sprintf("%.64s_%" PRIx64 ".ankimesh", mesh.name, hash); // Limit the filename size
 	return out;
 }
 
